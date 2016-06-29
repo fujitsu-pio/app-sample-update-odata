@@ -16,14 +16,19 @@
                         <script src="./lib/remodal.min.js"></script>
                         <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
                         <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/js/bootstrap.min.js"></script>
+                        <script src="./lib/jquery.uploadThumbs.js"></script>
                         <script type="text/javascript">
+                        
                             var demo = {};
                             demo.tokenJson = {};
                             demo.urlBase = 'https://demo.personium.io/baas-demo';
                             demo.urlBox = demo.urlBase + '/2'
                             demo.urlOdata = demo.urlBox + '/odata';
                             demo.urlGoodsList = demo.urlOdata + '/goods_list';
+                            demo.GoodsPhotoFolder = 'imges'
+                            demo.urlGoodsPhoto = demo.urlBox + '/' + demo.GoodsPhotoFolder;
                             demo.lang = 'en-un';
+                            demo.fd = '';
                             
                             demo.debug = function(data){
                                 alert(JSON.stringify(data))
@@ -41,7 +46,7 @@
                                        });
                             };
                         
-                          demo.goodsReg = function(data,access_token) {
+                          demo.goodsReg = function(data) {
                             $.ajax({
                                    type: "POST",
                                    url: demo.urlGoodsList,
@@ -53,14 +58,27 @@
                                    }
                                    });
                           };
+                        demo.goodsRegPhoto = function(id) {
+                            $.ajax({
+                                   type: "PUT",
+                                   url: demo.urlGoodsPhoto + '/' + id + '.png',
+                                   headers: {'Content-Type' : 'image/jpeg'},
+                                   processData : false,
+                                   data: demo.fd,
+                                   success: function(resp){
+                                   demo.goodsList();
+                                   demo.cleanGoods();
+                                   }
+                                   });
+                        };
                         
                         demo.goodsUpdate = function(id,data) {
                             $.ajax({
                                    type: "PUT",
                                    url: demo.urlGoodsList + '(\'' + id + '\')',
                                    data: data,
-                                   dataType: 'json',
-                                   headers: {'Accept':'application/json' , 'If-Match':'*'},
+                                   //dataType: 'json',
+                                   headers: {'Accept':'application/json'},
                                    success: function(resp){
                                    demo.goodsList();
                                    }
@@ -80,31 +98,20 @@
                                    });
                         };
                         
-                        demo.addCountryInfo = function(data) {
-                            var ary = data.d.results;
-                            var filters = [];
-                            for (var i in ary) {
-                                list.append(demo.listRow(ary[i]));
-                            }
-                            var filter = filters.join('+or+');
-                            
-                            $.ajax({
-                                   type: "GET",
-                                   url: demo.urlCountryInfo + '?$filter=__id'+demo.lang+'%2527&q=' + text,
-                                   dataType: 'json',
-                                   headers: {'Accept':'application/json'},
-                                   success: function(data){
-                                   demo.updateList(data);
-                                   }
-                                   });
-                        };
-                        
                         demo.setGoods = function(id,name,detail,url) {
                             $('#goods-id-text').val(id);
                             $('#goods-name-text').val(name);
                             $('#goods-detail-text').val(detail);
                             $('#goods-url-text').val(url);
-                        }
+                        };
+                        
+                        demo.cleanGoods = function() {
+                            $('#cgoods-name-text').val('');
+                            $('#cgoods-detail-text').val('');
+                            $('#cgoods-url-text').val('');
+                            $('#goods-photo').val('');
+                            $('img').remove();
+                        };
                         
                         demo.updateList = function(data) {
                             var ary = data.d.results;
@@ -122,19 +129,25 @@
                                                             $('.d-b-lang').removeClass('active');
                                                             $(this).addClass('active');
                                                             });*/
+                                         $('#goods-photo').change(function(e) {
+                                                                   demo.fd = e.target.files[0];
+                                                                  });
                                          $('#goods-send').click(function(){
-                                                                goods='{"goodsName":"' + $("#goods-name-text").val() + '","goodsUrl":"' + $("#goods-url-text").val() + '","goodsDetail":"' + $("#goods-detail-text").val() + '"}';
-                                                                demo.goodsReg(goods,demo.tokenJson.access_token);
+                                                                id = +new Date();
+                                                                goods = '{"__id":"' + id +'","goodsName":"' + $("#cgoods-name-text").val() + '","goodsUrl":"' + $("#cgoods-url-text").val() + '","goodsDetail":"' + $("#cgoods-detail-text").val() + '"}';
+                                                                demo.goodsReg(goods);
+                                                                demo.goodsRegPhoto(id);
                                                                 });
                                          $('#goods-del').click(function(){
                                                                demo.goodsDeltel($("#goods-id-text").val());
                                                                
                                                                 });
                                          $('#goods-confirm').click(function(){
-                                                               goods='{"goodsName":"' + $("#goods-name-text").val() + '","goodsUrl":"' + $("#goods-url-text").val() + '","goodsDetail":"' + $("#goods-detail-text").val() + '"}';
+                                                               goods = '{"goodsName":"' + $("#goods-name-text").val() + '","goodsUrl":"' + $("#goods-url-text").val() + '","goodsDetail":"' + $("#goods-detail-text").val() + '"}';
                                                                demo.goodsUpdate($("#goods-id-text").val(),goods);
                                                                
                                                                });
+                                         
                                          demo.goodsList();
                         });
                                           
@@ -151,7 +164,7 @@
                                                               <div class="list-group-item" id="${goodId}">  
                                                               <div class="media">
                                                               <a class="media-left" href="#detail" onclick="demo.setGoods('${goodsId}','${goodsName}','${goodsDetail}','${goodsUrl}')">
-                                                              <img class="media-object" src="https://images-na.ssl-images-amazon.com/images/I/31bseH35toL.jpg" width="100">
+                                                              <img class="media-object" src="./${GoodsPhotoFolder}/${goodsId}.png" width="100">
                                                               <div class="media-body">
                                                               <h4 class="media-heading">${goodsName}</h4>
                                                               <p>${goodsDetail}</p>
@@ -166,9 +179,26 @@
                             tmp = tmp.replace(/\${goodsDetail}/g, data.goodsDetail);
                             tmp = tmp.replace(/\${goodsUrl}/g, data.goodsUrl);
                             tmp = tmp.replace(/\${goodsId}/g, data.__id);
+                            tmp = tmp.replace(/\${GoodsPhotoFolder}/g, demo.GoodsPhotoFolder);
                             return tmp;
                         };
+                        
+                        $(function() {
+                          // jQuery Upload Thumbs
+                          $('#goods-photo').uploadThumbs({
+                                                            position : 0,      // 0:before, 1:after, 2:parent.prepend, 3:parent.append,
+                                                            // any: arbitrarily jquery selector
+                                                            imgbreak : true    // append <br> after thumbnail images
+                                                            });
+                          });
                         </script>
+                        <style>
+                            img.thumb {
+                                margin:0 5px 5px 0;
+                                max-width:160px;
+                                vertical-align:bottom;
+                            }
+                        </style>
                         </head>
     <!--    http://bootstrap3.cyberlab.info/gettingStarted/  --->
     <body>
@@ -181,38 +211,35 @@
                 </div>
             </nav>
             
-            <div class="input-group">
-               <!--   <span class="input-group-addon">input</span>
-                <input type="text" class="form-control" placeholder="Type Text" id="goods-name-text">
-                <input type="text" class="form-control" placeholder="Type Text" id="goods-url-text">
-                <input type="text" class="form-control" placeholder="Type Text" id="goods-detail-text">
-                    </div>
-                    <span class="input-group-btn">
-                        <button type="button" class="btn btn-default" id="auth">
-                            Authentication
-                        </button>
-                    </span>
-                    <span class="input-group-btn">
-                        <button type="button" class="btn btn-default" id="goods-send">
-                            send
-                        </button>
-                    </span> --->
-            
             <div class="panel panel-default">
-                <div class="panel-heading">Result</div>
+                <div class="panel-heading">
+                    <a class="media btn btn-success pull-right" href="#create" role="button">New item</a>
+                <h4>Item list</h4>
+                </div>
                 <div class="panel-body list-group" id="d-l-results"></div>
             </div>
             
             <div class="remodal" data-remodal-id="detail" data-remodal-options="hashTracking:true">
                 <button data-remodal-action="close" class="remodal-close"></button>
-                <h3>編集画面</h3>
+                <h3>Update</h3>
                 <input type="hidden" class="form-control" placeholder="Type Text" id="goods-id-text">
-                <p>グッズ名：</p><input type="text" class="form-control" placeholder="Type Text" id="goods-name-text">
-                <p>説明：</p><input type="text" class="form-control" placeholder="Type Text" id="goods-detail-text">
-                <p>URL：</p><input type="text" class="form-control" placeholder="Type Text" id="goods-url-text"></br>
-                <button data-remodal-action="cancel" class="remodal-cancel">キャンセル</button>
-                <button data-remodal-action="cancel" class="remodal-cancel" id="goods-del">削除</button>
-                <button data-remodal-action="confirm" class="remodal-confirm" id="goods-confirm">更新</button>
+                <p class="text-left">Goods name：</p><input type="text" class="form-control" placeholder="Type Text" id="goods-name-text"></br>
+                <p class="text-left">Detail：</p><input type="text" class="form-control" placeholder="Type Text" id="goods-detail-text"></br>
+                <p class="text-left">URL：</p><input type="text" class="form-control" placeholder="Type Text" id="goods-url-text"></br>
+                <button data-remodal-action="cancel" class="remodal-cancel">Cancel</button>
+                <button data-remodal-action="cancel" class="remodal-cancel" id="goods-del">Delete</button>
+                <button data-remodal-action="confirm" class="remodal-confirm" id="goods-confirm">Update</button>
+            </div>
+            <div class="remodal" data-remodal-id="create" data-remodal-options="hashTracking:true">
+                <button data-remodal-action="close" class="remodal-close"></button>
+                <h3>Create</h3>
+                <input type="hidden" class="form-control" placeholder="Type Text" >
+                <p class="text-left">Photo：<input type="file" name="images[]" multiple="multiple" id="goods-photo"/></p></br>
+                <p class="text-left">Goods name：</p><input type="text" class="form-control" placeholder="Type Text" id="cgoods-name-text"></br>
+                <p class="text-left">Detail：</p><input type="text" class="form-control" placeholder="Type Text" id="cgoods-detail-text"></br>
+                <p class="text-left">URL：</p><input type="text" class="form-control" placeholder="Type Text" id="cgoods-url-text"></br>
+                <button data-remodal-action="cancel" class="remodal-cancel">Cancel</button>
+                <button data-remodal-action="confirm" class="remodal-confirm" id="goods-send">Create</button>
             </div>
         </div>
     </body>
